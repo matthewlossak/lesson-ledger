@@ -1,0 +1,87 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f7f8f7;
+  --foreground: #1e2a2b;
+  --muted: #6b8180;
+  --border: #dde5e4;
+  --header: #0f3d3e;
+  --header-muted: #9fc9c8;
+  --primary: #b0603a;
+  --primary-hover: #96502f;
+  --badge: #eef6f4;
+  --badge-foreground: #0f3d3e;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-border: var(--border);
+  --color-header: var(--header);
+  --color-header-muted: var(--header-muted);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-badge: var(--badge);
+  --color-badge-foreground: var(--badge-foreground);
+  --font-sans: var(--font-source-sans);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), sans-serif;
+}
+
+/* iOS Safari paints native date/time picker chrome wider than the input's
+   own CSS box, causing it to bleed past the container edge on narrow
+   viewports. Disabling native appearance stops it from overriding our width. */
+input[type="date"],
+input[type="time"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* FullCalendar theming — reuse the app's own tokens instead of its default
+   dark-slate/blue theme, so it reads as part of the app rather than an
+   embedded third-party widget. */
+.fc {
+  --fc-border-color: var(--border);
+  --fc-page-bg-color: #ffffff;
+  --fc-neutral-bg-color: var(--badge);
+  --fc-neutral-text-color: var(--muted);
+  --fc-today-bg-color: var(--badge);
+  --fc-now-indicator-color: var(--primary);
+  --fc-highlight-color: var(--badge);
+  --fc-more-link-bg-color: var(--badge);
+  --fc-more-link-text-color: var(--header);
+  --fc-button-text-color: #ffffff;
+  --fc-button-bg-color: var(--header);
+  --fc-button-border-color: var(--header);
+  --fc-button-hover-bg-color: var(--muted);
+  --fc-button-hover-border-color: var(--muted);
+  --fc-button-active-bg-color: var(--primary);
+  --fc-button-active-border-color: var(--primary);
+  font-family: var(--font-sans), sans-serif;
+}
+
+.fc .fc-toolbar-title {
+  font-size: 1.375rem;
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.fc .fc-col-header-cell-cushion {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.fc .fc-button {
+  border-radius: 0.5rem;
+  text-transform: capitalize;
+}
+
+.fc .fc-button:focus,
+.fc .fc-button-primary:not(:disabled):active:focus {
+  box-shadow: 0 0 0 0.2rem rgba(15, 61, 62, 0.3) !important;
+}
