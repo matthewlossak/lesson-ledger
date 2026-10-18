@@ -218,7 +218,7 @@ export default function SessionList({
                     type="number"
                     min="0.5"
                     max="8"
-                    step="0.5"
+                    step="0.25"
                     defaultValue={editingSession.duration}
                     required
                     className={inputClass}

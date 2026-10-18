@@ -82,7 +82,7 @@ export default function SessionForm({ students }: { students: Student[] }) {
             type="number"
             min="0.5"
             max="8"
-            step="0.5"
+            step="0.25"
             placeholder="e.g. 1.5"
             required
             className={inputClass}
