@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Logo from './Logo'
 
 const links = [
   { href: '/students', label: 'Students' },
@@ -24,8 +25,9 @@ export default function HeaderNav({
       <Link
         href="/"
         onClick={() => setOpen(false)}
-        className="font-semibold text-white hover:text-header-muted transition-colors shrink-0"
+        className="flex items-center gap-2 font-semibold text-white hover:text-header-muted transition-colors shrink-0"
       >
+        <Logo className="w-6 h-6" />
         LessonLedger
       </Link>
 

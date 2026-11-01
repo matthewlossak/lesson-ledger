@@ -3,6 +3,7 @@ import { Source_Sans_3 } from "next/font/google";
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import HeaderNav from "./components/HeaderNav";
+import Logo from "./components/Logo";
 import "./globals.css";
 
 const sourceSans = Source_Sans_3({
@@ -43,8 +44,9 @@ export default async function RootLayout({
             <div className="max-w-3xl mx-auto px-4 h-14 flex items-center gap-6">
               <Link
                 href="/"
-                className="font-semibold text-white hover:text-header-muted transition-colors shrink-0"
+                className="flex items-center gap-2 font-semibold text-white hover:text-header-muted transition-colors shrink-0"
               >
+                <Logo className="w-6 h-6" />
                 LessonLedger
               </Link>
             </div>
