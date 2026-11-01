@@ -51,21 +51,24 @@ export default async function StudentDetailPage({
   const session = await auth()
   const userId = parseInt(session!.user.id)
 
-  const student = await prisma.student.findFirst({ where: { id: studentId, userId } })
-  if (!student) notFound()
-
   const dateFilter = getDateFilter(period)
 
-  const sessions = await prisma.session.findMany({
-    where: {
-      students: { some: { studentId } },
-      ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
-    },
-    include: {
-      students: { include: { student: true } },
-    },
-    orderBy: { date: 'desc' },
-  })
+  // Fetched in parallel; the session query is scoped to the user itself so it
+  // can't leak data even if the student lookup comes back empty.
+  const [student, sessions] = await Promise.all([
+    prisma.student.findFirst({ where: { id: studentId, userId } }),
+    prisma.session.findMany({
+      where: {
+        students: { some: { studentId, student: { userId } } },
+        ...(Object.keys(dateFilter).length > 0 && { date: dateFilter }),
+      },
+      include: {
+        students: { include: { student: true } },
+      },
+      orderBy: { date: 'desc' },
+    }),
+  ])
+  if (!student) notFound()
 
   const totalHours = sessions.reduce((sum, s) => sum + Number(s.duration), 0)
   const totalEarnings = sessions.reduce(
