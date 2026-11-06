@@ -32,6 +32,7 @@ export default async function SessionsPage() {
     duration: Number(s.duration),
     rateCharged: Number(s.rateCharged),
     note: s.note,
+    countsInMonth: s.countsInMonth,
     students: s.students.map(ss => ({
       studentId: ss.studentId,
       student: { name: ss.student.name },

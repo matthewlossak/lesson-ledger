@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react'
 import type { Student } from '@/app/generated/prisma/browser'
 import { getRate } from '@/lib/rates'
 import { isUpcoming, formatSessionDate, formatSessionTime } from '@/lib/sessions'
+import { formatMonth, parseMonthKey } from '@/lib/earnings'
 import { updateSession, deleteSession } from './actions'
 
 export type SessionRow = {
@@ -13,6 +14,7 @@ export type SessionRow = {
   duration: number
   rateCharged: number
   note: string | null
+  countsInMonth: string | null
   students: { studentId: number; student: { name: string } }[]
 }
 
@@ -78,6 +80,7 @@ export default function SessionList({
         rateCharged: rate,
         note: fd.get('note') as string,
         studentIds: selectedIds,
+        countsInMonth: fd.get('countsInMonth') as string,
       })
       closeEdit()
     })
@@ -112,16 +115,22 @@ export default function SessionList({
             year: 'numeric',
           })
           const formattedTime = session.startTime ? formatSessionTime(session.startTime) : null
+          const movedTo = parseMonthKey(session.countsInMonth ?? undefined)
 
           return (
             <li key={session.id} className={`px-4 py-3 ${upcoming ? 'bg-badge' : 'bg-white'} hover:bg-badge`}>
               <div className="flex items-start justify-between">
                 <div className="flex flex-col gap-0.5">
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <span className="font-medium text-foreground">{studentNames}</span>
                     {upcoming && (
                       <span className="text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
                         Scheduled
+                      </span>
+                    )}
+                    {movedTo && (
+                      <span className="text-xs font-medium text-badge-foreground bg-white border border-border rounded-full px-2 py-0.5">
+                        Counts in {formatMonth(movedTo)}
                       </span>
                     )}
                   </div>
@@ -295,6 +304,22 @@ export default function SessionList({
                       : 'bg-badge cursor-default select-none'
                   }`}
                 />
+              </div>
+
+              <div className="sm:w-64">
+                <label htmlFor="counts-in-month" className="block text-sm font-medium text-foreground mb-1">
+                  Move to another month <span className="text-muted font-normal">(optional)</span>
+                </label>
+                <input
+                  id="counts-in-month"
+                  name="countsInMonth"
+                  type="month"
+                  defaultValue={editingSession.countsInMonth ?? ''}
+                  className={inputClass}
+                />
+                <p className="text-xs text-muted mt-1">
+                  Counts in this month for earnings and invoices. Clear it to undo.
+                </p>
               </div>
 
               <div>

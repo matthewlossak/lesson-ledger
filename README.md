@@ -20,6 +20,7 @@ I built LessonLedger for that, and I use it myself. It saves me real time each m
 - Earnings overview with month-by-month and week-by-week charts
 - Calendar view of upcoming and past sessions
 - One-click monthly invoice export to Excel, matching a real invoice format
+- Move a session to another month when it missed that month's invoice
 - Multi-user accounts, so each tutor has their own private students and sessions
 
 ## Tech stack

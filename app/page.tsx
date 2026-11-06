@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { isUpcoming, formatSessionDate, formatSessionTime, melbourneToday } from '@/lib/sessions'
-import { formatDollars, formatRange, monthRange, totalsFor, weekRange } from '@/lib/earnings'
+import { formatDollars, formatRange, monthRange, totalsForMonth, totalsForRange, weekRange } from '@/lib/earnings'
 import PeriodCard from './components/PeriodCard'
 
 export default async function Home() {
@@ -28,6 +28,7 @@ export default async function Home() {
     startTime: s.startTime,
     duration: Number(s.duration),
     rateCharged: Number(s.rateCharged),
+    countsInMonth: s.countsInMonth,
   }))
   const today = melbourneToday(now)
   const thisWeek = weekRange(today)
@@ -56,12 +57,12 @@ export default async function Home() {
         <PeriodCard
           title="This week"
           range={formatRange(thisWeek)}
-          totals={totalsFor(earningsSessions, thisWeek, now)}
+          totals={totalsForRange(earningsSessions, thisWeek, now)}
         />
         <PeriodCard
           title="This month"
           range={formatRange(thisMonth)}
-          totals={totalsFor(earningsSessions, thisMonth, now)}
+          totals={totalsForMonth(earningsSessions, today, now)}
         />
       </div>
       <div className="flex justify-end mb-6">

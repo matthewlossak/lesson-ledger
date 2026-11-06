@@ -4,11 +4,9 @@ import {
   chartMonths,
   formatDollars,
   formatMonth,
-  formatRange,
   monthKey,
-  monthRange,
-  totalsFor,
-  weeksOfMonth,
+  monthBreakdown,
+  totalsForMonth,
   type EarningsSession,
 } from '@/lib/earnings'
 import BarChart, { type ChartBar } from './BarChart'
@@ -35,27 +33,22 @@ export default function EarningsView({
 }) {
   const monthBars: ChartBar[] = chartMonths(selected, currentMonth).map(month => ({
     key: monthKey(month),
-    // en-AU's short months include "June" and "Sept", too wide for 12 bars on a phone.
-    label: formatMonth(month, 'short').slice(0, 3),
+    label: formatMonth(month, 'short'),
     title: formatMonth(month),
-    totals: totalsFor(sessions, monthRange(month), now),
+    totals: totalsForMonth(sessions, month, now),
     href: `/earnings?month=${monthKey(month)}`,
     selected: month.getTime() === selected.getTime(),
   }))
 
-  const weeks = weeksOfMonth(selected).map(range => ({
-    range,
-    totals: totalsFor(sessions, range, now),
-  }))
-  const weekBars: ChartBar[] = weeks.map(({ range, totals }) => ({
-    key: range.start.toISOString(),
-    // The month is in the section heading, so the axis only needs the days.
-    label: formatRange(range).split(' ')[0],
-    title: formatRange(range),
-    totals,
+  const rows = monthBreakdown(sessions, selected, now)
+  const rowBars: ChartBar[] = rows.map(row => ({
+    key: row.start.toISOString(),
+    label: row.axisLabel,
+    title: row.title,
+    totals: row.totals,
   }))
 
-  const monthTotals = totalsFor(sessions, monthRange(selected), now)
+  const monthTotals = totalsForMonth(sessions, selected, now)
   const showScheduled = monthTotals.scheduled > 0
   const navLinkClass = 'border border-border bg-white rounded-lg w-8 h-8 flex items-center justify-center text-foreground hover:bg-badge transition-colors'
 
@@ -100,7 +93,7 @@ export default function EarningsView({
 
         <div className="border border-border rounded-xl bg-white p-4 sm:p-5 mb-6">
           <h3 className="text-sm font-semibold text-foreground mb-4">Week by week</h3>
-          <BarChart bars={weekBars} />
+          <BarChart bars={rowBars} />
         </div>
 
         <div className="border border-border rounded-xl overflow-hidden bg-white">
@@ -117,10 +110,10 @@ export default function EarningsView({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {weeks.map(({ range, totals }) => (
-                <tr key={range.start.toISOString()}>
+              {rows.map(({ start, title, totals }) => (
+                <tr key={start.toISOString()}>
                   <th scope="row" className="text-left font-normal text-foreground px-4 py-2 whitespace-nowrap">
-                    {formatRange(range)}
+                    {title}
                   </th>
                   <td className="text-right text-muted px-2 sm:px-4 py-2">{totals.sessions}</td>
                   <td className="text-right text-muted px-2 sm:px-4 py-2">{totals.hours}</td>

@@ -1,23 +1,17 @@
 'use client'
 
-import { useState } from 'react'
-import { addMonths, monthName, monthRange, parseMonthKey } from '@/lib/earnings'
+import { useOptimistic, useState, useTransition } from 'react'
+import { addMonths, countedMonth, monthKey, monthName, parseMonthKey } from '@/lib/earnings'
 import { formatSessionDate, isUpcoming } from '@/lib/sessions'
+import { moveSessionToMonth } from './actions'
 
 type ExportSession = {
   id: number
   date: string
   startTime: string | null
   duration: number
+  countsInMonth: string | null
   students: { student: { name: string } }[]
-}
-
-function sessionsIn(sessions: ExportSession[], month: Date) {
-  const { start, end } = monthRange(month)
-  return sessions.filter(s => {
-    const date = new Date(s.date)
-    return date >= start && date < end
-  })
 }
 
 export default function ExportInvoiceForm({
@@ -28,26 +22,34 @@ export default function ExportInvoiceForm({
   defaultPeriod: string // "YYYY-MM"
 }) {
   const [period, setPeriod] = useState(defaultPeriod)
-  const [ticked, setTicked] = useState<number[]>([])
-
-  const isFinished = (s: ExportSession) => !isUpcoming(s.date, s.startTime, s.duration)
+  const [, startTransition] = useTransition()
 
   const month = parseMonthKey(period)
   const previousMonth = month && addMonths(month, -1)
-  const lastMonthSessions = previousMonth
-    ? sessionsIn(sessions, previousMonth)
-        .filter(isFinished)
-        .sort((a, b) => b.date.localeCompare(a.date))
-    : []
-  const notYetHeld = month ? sessionsIn(sessions, month).filter(s => !isFinished(s)).length : 0
+  const previousKey = previousMonth && monthKey(previousMonth)
 
-  function changePeriod(value: string) {
-    setPeriod(value)
-    setTicked([])
-  }
+  // Last month's finished sessions, including any already moved into this month.
+  const movable = sessions
+    .filter(s => monthKey(new Date(s.date)) === previousKey)
+    .filter(s => s.countsInMonth === null || s.countsInMonth === period)
+    .filter(s => !isUpcoming(s.date, s.startTime, s.duration))
+    .sort((a, b) => b.date.localeCompare(a.date))
 
-  function toggle(id: number) {
-    setTicked(t => (t.includes(id) ? t.filter(x => x !== id) : [...t, id]))
+  const [movedIds, setMovedIds] = useOptimistic(
+    movable.filter(s => s.countsInMonth === period).map(s => s.id),
+    (ids: number[], change: { id: number; moved: boolean }) =>
+      change.moved ? [...ids, change.id] : ids.filter(id => id !== change.id),
+  )
+
+  const notYetHeld = sessions.filter(
+    s => countedMonth(s) === period && isUpcoming(s.date, s.startTime, s.duration),
+  ).length
+
+  function toggle(id: number, moved: boolean) {
+    startTransition(async () => {
+      setMovedIds({ id, moved })
+      await moveSessionToMonth(id, moved ? period : null)
+    })
   }
 
   return (
@@ -65,7 +67,7 @@ export default function ExportInvoiceForm({
           type="month"
           name="period"
           value={period}
-          onChange={e => changePeriod(e.target.value)}
+          onChange={e => setPeriod(e.target.value)}
           required
           className="border border-border rounded-lg px-2 py-1 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-primary bg-white"
         />
@@ -77,29 +79,30 @@ export default function ExportInvoiceForm({
         </button>
       </div>
 
-      {month && previousMonth && notYetHeld > 0 && (
+      {month && notYetHeld > 0 && (
         <p className="text-xs text-muted mt-2 mb-1">
           {notYetHeld} {notYetHeld === 1 ? 'session' : 'sessions'} later in {monthName(month)} {notYetHeld === 1 ? "hasn't" : "haven't"} happened
-          yet, so {notYetHeld === 1 ? 'it stays' : 'they stay'} off this invoice. You can add {notYetHeld === 1 ? 'it' : 'them'} to {monthName(addMonths(month, 1))}&apos;s.
+          yet, so {notYetHeld === 1 ? 'it stays' : 'they stay'} off this invoice. Move {notYetHeld === 1 ? 'it' : 'them'} into {monthName(addMonths(month, 1))} once held.
         </p>
       )}
 
-      {previousMonth && lastMonthSessions.length > 0 && (
+      {month && previousMonth && movable.length > 0 && (
         <details className="mt-2 mb-1">
           <summary className="text-sm text-foreground cursor-pointer">
-            Add sessions from {monthName(previousMonth)}
-            {ticked.length > 0 && <span className="text-muted"> ({ticked.length} added)</span>}
+            Move sessions from {monthName(previousMonth)}
+            {movedIds.length > 0 && <span className="text-muted"> ({movedIds.length} moved)</span>}
           </summary>
+          <p className="text-xs text-muted mt-2">
+            Ticked sessions become {monthName(month)} sessions for earnings and invoices. This saves as you tick.
+          </p>
           <ul className="mt-2 max-h-56 overflow-y-auto border border-border rounded-lg bg-white divide-y divide-border">
-            {lastMonthSessions.map(s => (
+            {movable.map(s => (
               <li key={s.id}>
                 <label className="flex items-start gap-2 px-3 py-2 text-sm text-foreground cursor-pointer hover:bg-badge">
                   <input
                     type="checkbox"
-                    name="extra"
-                    value={s.id}
-                    checked={ticked.includes(s.id)}
-                    onChange={() => toggle(s.id)}
+                    checked={movedIds.includes(s.id)}
+                    onChange={e => toggle(s.id, e.target.checked)}
                     className="mt-1 accent-primary"
                   />
                   <span>

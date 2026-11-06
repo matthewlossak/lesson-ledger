@@ -52,6 +52,7 @@ model Session {
   duration    Decimal          // hours, e.g. 1.5
   rateCharged Decimal          // $/hr actually charged; auto-filled but editable
   note        String?          // free-text: what was covered
+  countsInMonth String?        // "YYYY-MM" if moved to another month for earnings and invoices; null = the month of date
   students    SessionStudent[]
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt

@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { melbourneToday } from '@/lib/sessions'
-import { addMonths, chartMonths, parseMonthKey, startOfMonth } from '@/lib/earnings'
+import { addMonths, chartMonths, monthKey, parseMonthKey, startOfMonth } from '@/lib/earnings'
 import EarningsView from './EarningsView'
 
 export default async function EarningsPage({
@@ -23,9 +23,12 @@ export default async function EarningsPage({
   const sessions = await prisma.session.findMany({
     where: {
       students: { some: { student: { userId } } },
-      date: { gte: months[0], lt: addMonths(months[months.length - 1], 1) },
+      OR: [
+        { countsInMonth: { in: months.map(monthKey) } },
+        { countsInMonth: null, date: { gte: months[0], lt: addMonths(months[months.length - 1], 1) } },
+      ],
     },
-    select: { date: true, startTime: true, duration: true, rateCharged: true },
+    select: { date: true, startTime: true, duration: true, rateCharged: true, countsInMonth: true },
   })
 
   return (
@@ -35,6 +38,7 @@ export default async function EarningsPage({
         startTime: s.startTime,
         duration: Number(s.duration),
         rateCharged: Number(s.rateCharged),
+        countsInMonth: s.countsInMonth,
       }))}
       selected={selected}
       currentMonth={currentMonth}

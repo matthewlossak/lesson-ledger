@@ -3,6 +3,7 @@
 import { revalidatePath } from 'next/cache'
 import { prisma } from '@/lib/db'
 import { auth } from '@/auth'
+import { monthKey, parseMonthKey } from '@/lib/earnings'
 
 type SessionInput = {
   date: string
@@ -11,6 +12,7 @@ type SessionInput = {
   rateCharged: string
   note: string
   studentIds: number[]
+  countsInMonth?: string
 }
 
 async function currentUserId(): Promise<number> {
@@ -26,10 +28,19 @@ async function verifyStudentsOwned(userId: number, studentIds: number[]) {
   if (count !== studentIds.length) throw new Error('Unauthorized')
 }
 
+// Moving a session to the month it happened in is the same as not moving it.
+function normaliseCountsInMonth(month: string | null | undefined, date: Date): string | null {
+  const parsed = parseMonthKey(month ?? undefined)
+  if (!parsed) return null
+  const key = monthKey(parsed)
+  return key === monthKey(date) ? null : key
+}
+
 function revalidateSessions() {
   revalidatePath('/')
   revalidatePath('/sessions')
   revalidatePath('/calendar')
+  revalidatePath('/earnings')
   revalidatePath('/students', 'layout')
 }
 
@@ -62,11 +73,29 @@ export async function updateSession(id: number, input: SessionInput) {
       duration: parseFloat(input.duration),
       rateCharged: parseFloat(input.rateCharged),
       note: input.note.trim() || null,
+      countsInMonth: normaliseCountsInMonth(input.countsInMonth, new Date(input.date)),
       students: {
         deleteMany: {},
         create: input.studentIds.map(studentId => ({ studentId })),
       },
     },
+  })
+  revalidateSessions()
+}
+
+// Pass null to put a session back in the month it happened.
+export async function moveSessionToMonth(id: number, month: string | null) {
+  const userId = await currentUserId()
+  const session = await prisma.session.findFirst({
+    where: {
+      id,
+      students: { some: { student: { userId } } },
+    },
+  })
+  if (!session) throw new Error('Not found')
+  await prisma.session.update({
+    where: { id },
+    data: { countsInMonth: normaliseCountsInMonth(month, session.date) },
   })
   revalidateSessions()
 }

@@ -10,6 +10,7 @@ export type EarningsSession = {
   startTime: string | null
   duration: number
   rateCharged: number
+  countsInMonth: string | null
 }
 
 // end is exclusive
@@ -24,14 +25,9 @@ export type EarningsTotals = {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-export function totalsFor(
-  sessions: EarningsSession[],
-  range: DateRange,
-  now: Date,
-): EarningsTotals {
+function totalsOf(sessions: EarningsSession[], now: Date): EarningsTotals {
   const totals: EarningsTotals = { earned: 0, scheduled: 0, hours: 0, sessions: 0 }
   for (const s of sessions) {
-    if (s.date < range.start || s.date >= range.end) continue
     const amount = s.duration * s.rateCharged
     if (isUpcoming(s.date, s.startTime, s.duration, now)) {
       totals.scheduled += amount
@@ -42,6 +38,68 @@ export function totalsFor(
     }
   }
   return totals
+}
+
+function isWithin(date: Date, { start, end }: DateRange): boolean {
+  return date >= start && date < end
+}
+
+// By the date sessions actually happened, ignoring any move to another month.
+export function totalsForRange(
+  sessions: EarningsSession[],
+  range: DateRange,
+  now: Date,
+): EarningsTotals {
+  return totalsOf(sessions.filter(s => isWithin(s.date, range)), now)
+}
+
+// The month a session belongs to: where it was moved, else when it happened.
+export function countedMonth(s: { date: Date | string; countsInMonth: string | null }): string {
+  return s.countsInMonth ?? monthKey(new Date(s.date))
+}
+
+export function totalsForMonth(sessions: EarningsSession[], month: Date, now: Date): EarningsTotals {
+  return totalsOf(sessions.filter(s => countedMonth(s) === monthKey(month)), now)
+}
+
+export type MonthBreakdownRow = {
+  start: Date
+  axisLabel: string
+  title: string
+  totals: EarningsTotals
+}
+
+// A month's total split into its weeks, plus one row per month that sessions
+// were moved in from, so the rows always add up to the month's total.
+export function monthBreakdown(sessions: EarningsSession[], month: Date, now: Date): MonthBreakdownRow[] {
+  const counted = sessions.filter(s => countedMonth(s) === monthKey(month))
+  const ownMonth = monthRange(month)
+
+  const weeks = weeksOfMonth(month).map(range => ({
+    start: range.start,
+    // The month is in the section heading, so the axis only needs the days.
+    axisLabel: formatRange(range).split(' ')[0],
+    title: formatRange(range),
+    totals: totalsForRange(counted, range, now),
+  }))
+
+  const movedIn = new Map<string, EarningsSession[]>()
+  for (const s of counted) {
+    if (isWithin(s.date, ownMonth)) continue
+    const key = monthKey(s.date)
+    movedIn.set(key, [...(movedIn.get(key) ?? []), s])
+  }
+  const movedRows = [...movedIn].map(([key, moved]) => {
+    const origin = parseMonthKey(key)!
+    return {
+      start: origin,
+      axisLabel: formatMonth(origin, 'short'),
+      title: `From ${monthName(origin)}`,
+      totals: totalsOf(moved, now),
+    }
+  })
+
+  return [...movedRows, ...weeks].sort((a, b) => a.start.getTime() - b.start.getTime())
 }
 
 export function startOfMonth(day: Date): Date {
@@ -96,12 +154,12 @@ export function parseMonthKey(key: string | undefined): Date | null {
   return match ? new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, 1)) : null
 }
 
+// Short months are cut to three letters because en-AU gives "June" and "Sept".
 export function formatMonth(month: Date, style: 'short' | 'long' = 'long'): string {
-  return month.toLocaleDateString('en-AU', {
-    timeZone: 'UTC',
-    month: style,
-    ...(style === 'long' && { year: 'numeric' }),
-  })
+  if (style === 'short') {
+    return month.toLocaleDateString('en-AU', { timeZone: 'UTC', month: 'short' }).slice(0, 3)
+  }
+  return month.toLocaleDateString('en-AU', { timeZone: 'UTC', month: 'long', year: 'numeric' })
 }
 
 // e.g. "June"

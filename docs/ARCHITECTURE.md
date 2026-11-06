@@ -115,9 +115,10 @@ produces the lines of a real invoice:
   line.
 - Dates within a line are collapsed and formatted with ordinals (`1st, 8th`),
   grouped by duration.
-- Sessions held after last month's invoice went out can be ticked onto this one,
-  and read `30th [from June], 1st, 2nd - 1.5HRS`. Sessions that haven't finished
-  yet are left off, so they can't be billed twice.
+- A session can be moved to another month (`Session.countsInMonth`), which makes
+  it that month's for earnings and invoices while keeping its real date. On the
+  invoice it reads `[30th Aug - 1.5HRS], 1st, 2nd - 1HR`. Sessions that haven't
+  finished yet are left off.
 
 The result feeds `app/api/invoice/route.ts`, which fills the ExcelJS template
 and streams back an `.xlsx`.

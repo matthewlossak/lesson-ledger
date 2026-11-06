@@ -2,10 +2,10 @@
 // one line per student per month, unless a student had sessions at more
 // than one effective rate (e.g. solo AND group sessions), in which case
 // they get one line per rate, tagged [Individual] / [Group @ $X/hr].
-// Sessions carried over from an earlier month are tagged [from June] so the
-// day numbers still read correctly.
+// Sessions moved in from another month read [30th Aug - 1.5HRS], carrying their
+// own length, since the bare day number would otherwise be ambiguous.
 
-import { monthName } from './earnings'
+import { formatMonth } from './earnings'
 
 export type InvoiceSessionInput = {
   date: Date
@@ -37,28 +37,28 @@ function isSameMonth(a: Date, b: Date): boolean {
   return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth()
 }
 
-// e.g. "29th, 30th [from June], 1st, 2nd". dates must already be in order.
-function formatDays(dates: Date[], invoiceMonth: Date): string {
-  return dates
-    .map((date, i) => {
-      const next = dates[i + 1]
-      const endsMonthRun = !next || !isSameMonth(next, date)
-      const tag = endsMonthRun && !isSameMonth(date, invoiceMonth) ? ` [from ${monthName(date)}]` : ''
-      return `${ordinal(date.getUTCDate())}${tag}`
-    })
-    .join(', ')
+function formatMovedDate({ date, duration }: { date: Date; duration: number }): string {
+  return `[${ordinal(date.getUTCDate())} ${formatMonth(date, 'short')} - ${formatHoursLabel(duration)}]`
 }
 
 function formatDates(entries: { date: Date; duration: number }[], invoiceMonth: Date): string {
-  const byDuration = new Map<number, Date[]>()
   const sorted = [...entries].sort((a, b) => a.date.getTime() - b.date.getTime())
+  const moved = sorted.filter(e => !isSameMonth(e.date, invoiceMonth))
+  const byDuration = new Map<number, Date[]>()
   for (const e of sorted) {
+    if (moved.includes(e)) continue
     if (!byDuration.has(e.duration)) byDuration.set(e.duration, [])
     byDuration.get(e.duration)!.push(e.date)
   }
-  return [...byDuration]
-    .map(([duration, dates]) => `${formatDays(dates, invoiceMonth)} - ${formatHoursLabel(duration)}`)
-    .join(', ')
+  const ownMonth = [...byDuration].map(([duration, dates]) => {
+    const days = dates.map(date => ordinal(date.getUTCDate()))
+    return `${days.join(', ')} - ${formatHoursLabel(duration)}`
+  })
+  return [
+    ...moved.filter(e => e.date < invoiceMonth).map(formatMovedDate),
+    ...ownMonth,
+    ...moved.filter(e => e.date > invoiceMonth).map(formatMovedDate),
+  ].join(', ')
 }
 
 type RateGroup = {

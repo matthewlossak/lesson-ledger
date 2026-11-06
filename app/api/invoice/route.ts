@@ -51,29 +51,20 @@ export async function GET(req: NextRequest) {
 
   const monthStart = new Date(Date.UTC(year, month - 1, 1))
   const monthEnd = new Date(Date.UTC(year, month, 1))
-  const previousMonthStart = new Date(Date.UTC(year, month - 2, 1))
-
-  // Sessions from last month the tutor ticked because they fell after that
-  // month's invoice went out.
-  const carriedOverIds = searchParams
-    .getAll('extra')
-    .map(Number)
-    .filter(Number.isInteger)
-
   const now = new Date()
   const allSessions = await prisma.session.findMany({
     where: {
       students: { some: { student: { userId } } },
       OR: [
-        { date: { gte: monthStart, lt: monthEnd } },
-        { id: { in: carriedOverIds }, date: { gte: previousMonthStart, lt: monthStart } },
+        { countsInMonth: period },
+        { countsInMonth: null, date: { gte: monthStart, lt: monthEnd } },
       ],
     },
     include: { students: { include: { student: true } } },
     orderBy: { date: 'asc' },
   })
-  // Only bill what has happened. Anything still to come can be ticked onto
-  // next month's invoice, so it never gets billed twice.
+  // Only bill what has happened. Anything still to come can be moved onto
+  // next month's invoice instead.
   const sessions = allSessions.filter(s => !isUpcoming(s.date, s.startTime, Number(s.duration), now))
 
   const sessionInputs: InvoiceSessionInput[] = sessions.flatMap(s =>
