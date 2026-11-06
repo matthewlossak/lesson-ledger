@@ -5,6 +5,8 @@ import { prisma } from '@/lib/db'
 import { auth } from '@/auth'
 import SessionList from './SessionList'
 import ExportInvoiceForm from './ExportInvoiceForm'
+import { melbourneToday } from '@/lib/sessions'
+import { monthKey } from '@/lib/earnings'
 
 export default async function SessionsPage() {
   const session = await auth()
@@ -48,7 +50,7 @@ export default async function SessionsPage() {
         </Link>
       </div>
       <div className="flex justify-end mb-6">
-        <ExportInvoiceForm />
+        <ExportInvoiceForm sessions={sessionRows} defaultPeriod={monthKey(melbourneToday())} />
       </div>
       <SessionList sessions={sessionRows} allStudents={students} />
     </div>

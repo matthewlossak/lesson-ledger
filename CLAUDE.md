@@ -66,6 +66,7 @@ The original v1 scope is done, plus several items once in the parking lot:
 5. Invoicing (per-student xlsx export, with saved invoice details in settings)
 6. Calendar view (FullCalendar, themed to the app)
 7. Scheduling groundwork: sessions carry a start time and an upcoming-vs-past distinction
+8. Earnings overview: month-by-month and week-by-week charts (`app/earnings/`), plus this week / this month cards on the dashboard
 
 ## Parking Lot (not built — do not build without asking)
 

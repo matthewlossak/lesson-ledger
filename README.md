@@ -17,6 +17,7 @@ I built LessonLedger for that, and I use it myself. It saves me real time each m
 - Fast session logging: date, time, duration, one or more students, and a note on what was covered
 - Automatic rate calculation by tier and group size, with a manual override when needed
 - Per-student history and total earnings over selectable time periods
+- Earnings overview with month-by-month and week-by-week charts
 - Calendar view of upcoming and past sessions
 - One-click monthly invoice export to Excel, matching a real invoice format
 - Multi-user accounts, so each tutor has their own private students and sessions

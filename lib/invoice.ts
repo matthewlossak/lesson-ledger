@@ -2,6 +2,10 @@
 // one line per student per month, unless a student had sessions at more
 // than one effective rate (e.g. solo AND group sessions), in which case
 // they get one line per rate, tagged [Individual] / [Group @ $X/hr].
+// Sessions carried over from an earlier month are tagged [from June] so the
+// day numbers still read correctly.
+
+import { monthName } from './earnings'
 
 export type InvoiceSessionInput = {
   date: Date
@@ -29,21 +33,31 @@ function formatHoursLabel(hours: number): string {
   return hours === 1 ? '1HR' : `${hours}HRS`
 }
 
-function formatDates(entries: { day: number; duration: number }[]): string {
-  const byDuration = new Map<number, number[]>()
-  const order: number[] = []
-  for (const e of entries) {
-    if (!byDuration.has(e.duration)) {
-      byDuration.set(e.duration, [])
-      order.push(e.duration)
-    }
-    byDuration.get(e.duration)!.push(e.day)
-  }
-  return order
-    .map(duration => {
-      const days = [...byDuration.get(duration)!].sort((a, b) => a - b).map(ordinal)
-      return `${days.join(', ')} - ${formatHoursLabel(duration)}`
+function isSameMonth(a: Date, b: Date): boolean {
+  return a.getUTCFullYear() === b.getUTCFullYear() && a.getUTCMonth() === b.getUTCMonth()
+}
+
+// e.g. "29th, 30th [from June], 1st, 2nd". dates must already be in order.
+function formatDays(dates: Date[], invoiceMonth: Date): string {
+  return dates
+    .map((date, i) => {
+      const next = dates[i + 1]
+      const endsMonthRun = !next || !isSameMonth(next, date)
+      const tag = endsMonthRun && !isSameMonth(date, invoiceMonth) ? ` [from ${monthName(date)}]` : ''
+      return `${ordinal(date.getUTCDate())}${tag}`
     })
+    .join(', ')
+}
+
+function formatDates(entries: { date: Date; duration: number }[], invoiceMonth: Date): string {
+  const byDuration = new Map<number, Date[]>()
+  const sorted = [...entries].sort((a, b) => a.date.getTime() - b.date.getTime())
+  for (const e of sorted) {
+    if (!byDuration.has(e.duration)) byDuration.set(e.duration, [])
+    byDuration.get(e.duration)!.push(e.date)
+  }
+  return [...byDuration]
+    .map(([duration, dates]) => `${formatDays(dates, invoiceMonth)} - ${formatHoursLabel(duration)}`)
     .join(', ')
 }
 
@@ -52,10 +66,13 @@ type RateGroup = {
   studentName: string
   rate: number
   isGroup: boolean
-  entries: { day: number; duration: number }[]
+  entries: { date: Date; duration: number }[]
 }
 
-export function buildInvoiceLines(sessions: InvoiceSessionInput[]): InvoiceLine[] {
+export function buildInvoiceLines(
+  sessions: InvoiceSessionInput[],
+  invoiceMonth: Date, // first of the month, UTC
+): InvoiceLine[] {
   const groupMap = new Map<string, RateGroup>()
 
   for (const s of sessions) {
@@ -67,7 +84,7 @@ export function buildInvoiceLines(sessions: InvoiceSessionInput[]): InvoiceLine[
       g = { studentId: s.studentId, studentName: s.studentName, rate, isGroup, entries: [] }
       groupMap.set(key, g)
     }
-    g.entries.push({ day: s.date.getUTCDate(), duration: s.duration })
+    g.entries.push({ date: s.date, duration: s.duration })
   }
 
   const byStudent = new Map<number, RateGroup[]>()
@@ -90,7 +107,7 @@ export function buildInvoiceLines(sessions: InvoiceSessionInput[]): InvoiceLine[
 
     for (const g of groups) {
       const hours = g.entries.reduce((sum, e) => sum + e.duration, 0)
-      const dates = formatDates(g.entries)
+      const dates = formatDates(g.entries, invoiceMonth)
       let label = g.studentName
       if (needsTag) {
         label += g.isGroup ? ` [Group @ $${g.rate}/hr]` : ' [Individual]'

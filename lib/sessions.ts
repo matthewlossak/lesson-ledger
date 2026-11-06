@@ -8,18 +8,29 @@ export const APP_TZ = "Australia/Melbourne"
 // The wall-clock date/time a Melbourne clock shows for a given instant,
 // packed into a single comparable number via Date.UTC. We only ever compare
 // these packed numbers against each other, never treat them as real instants.
+// The formatter is shared because constructing Intl objects is slow and this
+// runs once per session on the dashboard and earnings pages.
+const melbourneFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  hourCycle: "h23",
+})
+
 function melbourneComparable(instant: Date): number {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: APP_TZ,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hourCycle: "h23",
-  }).formatToParts(instant)
+  const parts = melbourneFormat.formatToParts(instant)
   const get = (type: string) => Number(parts.find(p => p.type === type)!.value)
   return Date.UTC(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"))
+}
+
+// Today's calendar day in Melbourne as UTC midnight, the same form session
+// dates are stored in, so the two can be compared directly.
+export function melbourneToday(now: Date = new Date()): Date {
+  const d = new Date(melbourneComparable(now))
+  return new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()))
 }
 
 // Format a stored session date (UTC midnight) for display, in Melbourne time

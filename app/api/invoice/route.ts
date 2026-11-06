@@ -4,6 +4,7 @@ import path from 'path'
 import { auth } from '@/auth'
 import { prisma } from '@/lib/db'
 import { buildInvoiceLines, type InvoiceSessionInput } from '@/lib/invoice'
+import { isUpcoming, melbourneToday } from '@/lib/sessions'
 
 const MONTH_ABBREV = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -50,15 +51,30 @@ export async function GET(req: NextRequest) {
 
   const monthStart = new Date(Date.UTC(year, month - 1, 1))
   const monthEnd = new Date(Date.UTC(year, month, 1))
+  const previousMonthStart = new Date(Date.UTC(year, month - 2, 1))
 
-  const sessions = await prisma.session.findMany({
+  // Sessions from last month the tutor ticked because they fell after that
+  // month's invoice went out.
+  const carriedOverIds = searchParams
+    .getAll('extra')
+    .map(Number)
+    .filter(Number.isInteger)
+
+  const now = new Date()
+  const allSessions = await prisma.session.findMany({
     where: {
       students: { some: { student: { userId } } },
-      date: { gte: monthStart, lt: monthEnd },
+      OR: [
+        { date: { gte: monthStart, lt: monthEnd } },
+        { id: { in: carriedOverIds }, date: { gte: previousMonthStart, lt: monthStart } },
+      ],
     },
     include: { students: { include: { student: true } } },
     orderBy: { date: 'asc' },
   })
+  // Only bill what has happened. Anything still to come can be ticked onto
+  // next month's invoice, so it never gets billed twice.
+  const sessions = allSessions.filter(s => !isUpcoming(s.date, s.startTime, Number(s.duration), now))
 
   const sessionInputs: InvoiceSessionInput[] = sessions.flatMap(s =>
     s.students.map(ss => ({
@@ -71,7 +87,7 @@ export async function GET(req: NextRequest) {
     }))
   )
 
-  const lines = buildInvoiceLines(sessionInputs)
+  const lines = buildInvoiceLines(sessionInputs, monthStart)
 
   const workbook = new ExcelJS.Workbook()
   await workbook.xlsx.readFile(TEMPLATE_PATH)
@@ -83,7 +99,9 @@ export async function GET(req: NextRequest) {
   ws.getCell('A4').value = `ABN: ${user.abn ?? ''}`
   ws.getCell('A6').value = `BSB: ${user.bsb ?? ''}`
   ws.getCell('A7').value = `Account Number: ${user.accountNumber ?? ''}`
-  ws.getCell('H4').value = new Date(Date.UTC(year, month, 0)) // last day of the month
+  // The day it's sent if that's within the invoice month, else the month's last day.
+  const today = melbourneToday(now)
+  ws.getCell('H4').value = today >= monthStart && today < monthEnd ? today : new Date(Date.UTC(year, month, 0))
 
   ws.getCell('A10').value = user.billToName ?? ''
   const addressLines = (user.billToAddress ?? '').split('\n').filter(Boolean)

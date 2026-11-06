@@ -115,6 +115,9 @@ produces the lines of a real invoice:
   line.
 - Dates within a line are collapsed and formatted with ordinals (`1st, 8th`),
   grouped by duration.
+- Sessions held after last month's invoice went out can be ticked onto this one,
+  and read `30th [from June], 1st, 2nd - 1.5HRS`. Sessions that haven't finished
+  yet are left off, so they can't be billed twice.
 
 The result feeds `app/api/invoice/route.ts`, which fills the ExcelJS template
 and streams back an `.xlsx`.
@@ -158,6 +161,7 @@ Schema lives in `prisma/schema.prisma`; migrations in `prisma/migrations/`.
 | `app/` | Routes. Each folder is a route; `page.tsx` renders it, `actions.ts` holds its Server Actions. |
 | `app/api/invoice/route.ts` | Generates and streams the `.xlsx` invoice. |
 | `lib/sessions.ts` | Timezone-safe date logic (upcoming vs past, formatting). |
+| `lib/earnings.ts` | Week and month ranges and earnings totals for the dashboard and earnings pages. |
 | `lib/invoice.ts` | Invoice line-item aggregation. |
 | `lib/rates.ts` | Rate constants and `getRate()`. |
 | `lib/db.ts` | Prisma client (Neon adapter). |

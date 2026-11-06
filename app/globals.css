@@ -11,6 +11,8 @@
   --primary-hover: #96502f;
   --badge: #eef6f4;
   --badge-foreground: #0f3d3e;
+  --chart-earned: #008f8f;
+  --chart-scheduled: #b0603a;
 }
 
 @theme inline {
@@ -24,6 +26,8 @@
   --color-primary-hover: var(--primary-hover);
   --color-badge: var(--badge);
   --color-badge-foreground: var(--badge-foreground);
+  --color-chart-earned: var(--chart-earned);
+  --color-chart-scheduled: var(--chart-scheduled);
   --font-sans: var(--font-source-sans);
 }
 
