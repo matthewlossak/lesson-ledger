@@ -39,6 +39,8 @@ export default async function SessionsPage() {
     })),
   }))
 
+  const currentMonth = monthKey(melbourneToday())
+
   return (
     <div className="max-w-3xl mx-auto px-4 py-8">
       <div className="flex items-center justify-between mb-4">
@@ -51,9 +53,9 @@ export default async function SessionsPage() {
         </Link>
       </div>
       <div className="flex justify-end mb-6">
-        <ExportInvoiceForm sessions={sessionRows} defaultPeriod={monthKey(melbourneToday())} />
+        <ExportInvoiceForm sessions={sessionRows} defaultPeriod={currentMonth} />
       </div>
-      <SessionList sessions={sessionRows} allStudents={students} />
+      <SessionList sessions={sessionRows} allStudents={students} currentMonth={currentMonth} />
     </div>
   )
 }

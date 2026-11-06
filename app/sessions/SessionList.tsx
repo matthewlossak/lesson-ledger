@@ -4,7 +4,7 @@ import { useState, useTransition } from 'react'
 import type { Student } from '@/app/generated/prisma/browser'
 import { getRate } from '@/lib/rates'
 import { isUpcoming, formatSessionDate, formatSessionTime } from '@/lib/sessions'
-import { formatMonth, parseMonthKey } from '@/lib/earnings'
+import { countedMonth, formatDollars, formatMonth, monthName, parseMonthKey } from '@/lib/earnings'
 import { updateSession, deleteSession } from './actions'
 
 export type SessionRow = {
@@ -28,12 +28,35 @@ function autoRate(allStudents: Student[], selectedIds: number[]): string {
   return String(getRate(tier, selectedIds.length))
 }
 
+// Newest month first. A moved session sits under the month it counts in.
+function groupByMonth(sessions: SessionRow[]) {
+  const months = new Map<string, SessionRow[]>()
+  for (const s of sessions) {
+    const key = countedMonth(s)
+    months.set(key, [...(months.get(key) ?? []), s])
+  }
+  return [...months]
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([key, rows]) => {
+      let earned = 0
+      let scheduled = 0
+      for (const s of rows) {
+        const amount = s.duration * s.rateCharged
+        if (isUpcoming(s.date, s.startTime, s.duration)) scheduled += amount
+        else earned += amount
+      }
+      return { key, rows, earned, scheduled }
+    })
+}
+
 export default function SessionList({
   sessions,
   allStudents,
+  currentMonth,
 }: {
   sessions: SessionRow[]
   allStudents: Student[]
+  currentMonth: string // "YYYY-MM"
 }) {
   const [editingSession, setEditingSession] = useState<SessionRow | null>(null)
   const [deletingId, setDeletingId] = useState<number | null>(null)
@@ -101,92 +124,119 @@ export default function SessionList({
     )
   }
 
+  const months = groupByMonth(sessions)
+  // The current month, or if it's empty, the latest month that isn't in the future.
+  const openMonth = months.find(m => m.key <= currentMonth)?.key ?? months[0].key
+
   return (
     <>
-      <ul className="divide-y divide-border border border-border rounded-xl overflow-hidden">
-        {sessions.map(session => {
-          const earnings = session.duration * session.rateCharged
-          const studentNames = session.students.map(ss => ss.student.name).join(', ')
-          const upcoming = isUpcoming(session.date, session.startTime, session.duration)
-          const formattedDate = formatSessionDate(session.date, {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-            year: 'numeric',
-          })
-          const formattedTime = session.startTime ? formatSessionTime(session.startTime) : null
-          const movedTo = parseMonthKey(session.countsInMonth ?? undefined)
+      <div className="flex flex-col gap-3">
+        {months.map(month => (
+          <details
+            key={month.key}
+            open={month.key === openMonth}
+            className="group border border-border rounded-xl overflow-hidden bg-white"
+          >
+            <summary className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer list-none [&::-webkit-details-marker]:hidden hover:bg-badge">
+              <span className="flex items-center gap-2 font-semibold text-foreground whitespace-nowrap">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-muted transition-transform group-open:rotate-90" aria-hidden="true">
+                  <path d="M4 2l4 4-4 4" />
+                </svg>
+                {formatMonth(parseMonthKey(month.key)!)}
+              </span>
+              <span className="text-sm text-muted text-right">
+                {month.rows.length} {month.rows.length === 1 ? 'session' : 'sessions'}
+                {month.earned > 0 && ` · ${formatDollars(month.earned)}`}
+                {month.scheduled > 0 && ` ${month.earned > 0 ? '+' : '·'} ${formatDollars(month.scheduled)} scheduled`}
+              </span>
+            </summary>
+            <ul className="divide-y divide-border border-t border-border">
+              {month.rows.map(session => {
+                const earnings = session.duration * session.rateCharged
+                const studentNames = session.students.map(ss => ss.student.name).join(', ')
+                const upcoming = isUpcoming(session.date, session.startTime, session.duration)
+                const formattedDate = formatSessionDate(session.date, {
+                  weekday: 'short',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
+                const formattedTime = session.startTime ? formatSessionTime(session.startTime) : null
+                const movedFrom = session.countsInMonth ? monthName(new Date(session.date)) : null
 
-          return (
-            <li key={session.id} className={`px-4 py-3 ${upcoming ? 'bg-badge' : 'bg-white'} hover:bg-badge`}>
-              <div className="flex items-start justify-between">
-                <div className="flex flex-col gap-0.5">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-foreground">{studentNames}</span>
-                    {upcoming && (
-                      <span className="text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
-                        Scheduled
-                      </span>
-                    )}
-                    {movedTo && (
-                      <span className="text-xs font-medium text-badge-foreground bg-white border border-border rounded-full px-2 py-0.5">
-                        Counts in {formatMonth(movedTo)}
-                      </span>
-                    )}
-                  </div>
-                  <span className="text-sm text-muted">
-                    {formattedDate}{formattedTime ? ` · ${formattedTime}` : ''}
-                  </span>
-                  {session.note && (
-                    <span className="text-sm text-muted mt-1">{session.note}</span>
-                  )}
-                </div>
-                <div className="flex flex-col items-end gap-0.5 shrink-0 ml-4">
-                  <span className={`font-medium ${upcoming ? 'text-muted' : 'text-foreground'}`}>
-                    ${earnings.toFixed(2)}
-                  </span>
-                  <span className="text-sm text-muted">
-                    {session.duration}h @ ${session.rateCharged}/hr
-                  </span>
-                  {deletingId === session.id ? (
-                    <div className="flex items-center gap-2 text-sm mt-1">
-                      <span className="text-muted">Delete?</span>
-                      <button
-                        onClick={() => handleDelete(session.id)}
-                        disabled={isPending}
-                        className="text-red-600 font-medium hover:text-red-700 disabled:opacity-50"
-                      >
-                        Yes
-                      </button>
-                      <button
-                        onClick={() => setDeletingId(null)}
-                        className="text-muted hover:text-foreground"
-                      >
-                        Cancel
-                      </button>
+                return (
+                  <li key={session.id} className={`px-4 py-3 ${upcoming ? 'bg-badge' : 'bg-white'} hover:bg-badge`}>
+                    <div className="flex items-start justify-between">
+                      <div className="flex flex-col gap-0.5">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="font-medium text-foreground">{studentNames}</span>
+                          {upcoming && (
+                            <span className="text-xs font-medium text-blue-600 bg-blue-50 border border-blue-200 rounded-full px-2 py-0.5">
+                              Scheduled
+                            </span>
+                          )}
+                          {movedFrom && (
+                            <span className="text-xs font-medium text-badge-foreground bg-white border border-border rounded-full px-2 py-0.5">
+                              Moved from {movedFrom}
+                            </span>
+                          )}
+                        </div>
+                        <span className="text-sm text-muted">
+                          {formattedDate}{formattedTime ? ` · ${formattedTime}` : ''}
+                        </span>
+                        {session.note && (
+                          <span className="text-sm text-muted mt-1">{session.note}</span>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-0.5 shrink-0 ml-4">
+                        <span className={`font-medium ${upcoming ? 'text-muted' : 'text-foreground'}`}>
+                          ${earnings.toFixed(2)}
+                        </span>
+                        <span className="text-sm text-muted">
+                          {session.duration}h @ ${session.rateCharged}/hr
+                        </span>
+                        {deletingId === session.id ? (
+                          <div className="flex items-center gap-2 text-sm mt-1">
+                            <span className="text-muted">Delete?</span>
+                            <button
+                              onClick={() => handleDelete(session.id)}
+                              disabled={isPending}
+                              className="text-red-600 font-medium hover:text-red-700 disabled:opacity-50"
+                            >
+                              Yes
+                            </button>
+                            <button
+                              onClick={() => setDeletingId(null)}
+                              className="text-muted hover:text-foreground"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-3 mt-1">
+                            <button
+                              onClick={() => openEdit(session)}
+                              className="text-sm text-muted hover:text-foreground transition-colors"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => setDeletingId(session.id)}
+                              className="text-sm text-red-400 hover:text-red-600 transition-colors"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  ) : (
-                    <div className="flex items-center gap-3 mt-1">
-                      <button
-                        onClick={() => openEdit(session)}
-                        className="text-sm text-muted hover:text-foreground transition-colors"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeletingId(session.id)}
-                        className="text-sm text-red-400 hover:text-red-600 transition-colors"
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </li>
-          )
-        })}
-      </ul>
+                  </li>
+                )
+              })}
+            </ul>
+          </details>
+        ))}
+      </div>
 
       {editingSession && (
         <div
