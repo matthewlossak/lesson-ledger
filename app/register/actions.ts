@@ -17,13 +17,7 @@ export async function register(prevState: string | null, formData: FormData): Pr
     if (existing) return 'An account with that email already exists.'
 
     const hashed = await bcrypt.hash(password, 10)
-    const user = await prisma.user.create({ data: { email, password: hashed, name } })
-
-    // Claim any students that existed before auth was added
-    await prisma.student.updateMany({
-      where: { userId: null },
-      data: { userId: user.id },
-    })
+    await prisma.user.create({ data: { email, password: hashed, name } })
 
     await signIn('credentials', { email, password, redirectTo: '/' })
     return null

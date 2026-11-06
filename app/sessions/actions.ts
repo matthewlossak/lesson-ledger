@@ -28,6 +28,17 @@ async function verifyStudentsOwned(userId: number, studentIds: number[]) {
   if (count !== studentIds.length) throw new Error('Unauthorized')
 }
 
+async function findOwnedSession(userId: number, id: number) {
+  const session = await prisma.session.findFirst({
+    where: {
+      id,
+      students: { some: { student: { userId } } },
+    },
+  })
+  if (!session) throw new Error('Not found')
+  return session
+}
+
 // Moving a session to the month it happened in is the same as not moving it.
 function normaliseCountsInMonth(month: string | null | undefined, date: Date): string | null {
   const parsed = parseMonthKey(month ?? undefined)
@@ -64,6 +75,7 @@ export async function createSession(input: SessionInput) {
 
 export async function updateSession(id: number, input: SessionInput) {
   const userId = await currentUserId()
+  await findOwnedSession(userId, id)
   await verifyStudentsOwned(userId, input.studentIds)
   await prisma.session.update({
     where: { id },
@@ -86,13 +98,7 @@ export async function updateSession(id: number, input: SessionInput) {
 // Pass null to put a session back in the month it happened.
 export async function moveSessionToMonth(id: number, month: string | null) {
   const userId = await currentUserId()
-  const session = await prisma.session.findFirst({
-    where: {
-      id,
-      students: { some: { student: { userId } } },
-    },
-  })
-  if (!session) throw new Error('Not found')
+  const session = await findOwnedSession(userId, id)
   await prisma.session.update({
     where: { id },
     data: { countsInMonth: normaliseCountsInMonth(month, session.date) },
@@ -102,13 +108,7 @@ export async function moveSessionToMonth(id: number, month: string | null) {
 
 export async function deleteSession(id: number) {
   const userId = await currentUserId()
-  const session = await prisma.session.findFirst({
-    where: {
-      id,
-      students: { some: { student: { userId } } },
-    },
-  })
-  if (!session) throw new Error('Not found')
+  await findOwnedSession(userId, id)
   await prisma.session.delete({ where: { id } })
   revalidateSessions()
 }
