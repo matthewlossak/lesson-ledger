@@ -19,7 +19,7 @@ function axisStep(max: number): number {
 }
 
 function Bar({ bar, axisMax, index, count }: { bar: ChartBar; axisMax: number; index: number; count: number }) {
-  const { earned, scheduled, sessions, hours } = bar.totals
+  const { earned, scheduled, sessions, hours, scheduledSessions } = bar.totals
   const total = earned + scheduled
   const tipBottom = (total / axisMax) * 100
   // Keep the tooltip inside the chart at both edges.
@@ -64,8 +64,15 @@ function Bar({ bar, axisMax, index, count }: { bar: ChartBar; axisMax: number; i
             <span className="font-medium text-foreground">{formatDollars(scheduled)}</span>
           </p>
         )}
+        {earned > 0 && scheduled > 0 && (
+          <p className="flex items-center justify-between gap-2 mt-1 pt-1 border-t border-border font-semibold text-foreground">
+            <span>Total</span>
+            <span>{formatDollars(total)}</span>
+          </p>
+        )}
         <p className="mt-1">
           {sessions} {sessions === 1 ? 'session' : 'sessions'} · {hours}h
+          {scheduledSessions > 0 && `, ${scheduledSessions} scheduled`}
         </p>
       </div>
     </>

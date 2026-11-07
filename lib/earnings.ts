@@ -21,16 +21,18 @@ export type EarningsTotals = {
   scheduled: number // sessions still to come
   hours: number // finished sessions only
   sessions: number // finished sessions only
+  scheduledSessions: number
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
 function totalsOf(sessions: EarningsSession[], now: Date): EarningsTotals {
-  const totals: EarningsTotals = { earned: 0, scheduled: 0, hours: 0, sessions: 0 }
+  const totals: EarningsTotals = { earned: 0, scheduled: 0, hours: 0, sessions: 0, scheduledSessions: 0 }
   for (const s of sessions) {
     const amount = s.duration * s.rateCharged
     if (isUpcoming(s.date, s.startTime, s.duration, now)) {
       totals.scheduled += amount
+      totals.scheduledSessions += 1
     } else {
       totals.earned += amount
       totals.hours += s.duration
